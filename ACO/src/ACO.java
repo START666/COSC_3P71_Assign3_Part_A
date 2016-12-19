@@ -5,20 +5,11 @@
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
-import java.util.ArrayList;
+import java.util.*;
 
 public class ACO {
 
-    private Ant[] ants;
-    private int antNum;
-    private int cityNum;
-    private int MAX_GEN;
-    private float[][] pheromone;
-    private int[][] distance;
-    private int bestLength;
-    private int[] bestTour;
-    private int[] x;
-    private int[] y;
+    public static boolean debug = true;
 
     private int tagName = -1;
     private int tagDimension = -1;
@@ -27,22 +18,30 @@ public class ACO {
 
     private String name;
     private ArrayList<String> file;
+    private Ant[] ants;
+    private int antNum;
+    private int cityNum;
+    private int MAX_GEN;
+    private double[][] pheromoneTable;
+    private int[][] distanceTable;
+    private int bestLength;
+    private Queue<Integer> bestLengthTracker;
+    private int[] bestTour;
+    private int[] x;
+    private int[] y;
 
-    private float alpha;
-    private float beta;
-    private float rho;
+    private double a;
+    private double b;
+    private double r;
 
-    public ACO() {
-
-    }
-
-    public ACO(int m, int g, float a, float b, float r) {
+    public ACO(int m, int g, double a, double b, double r) {
         antNum = m;
         ants = new Ant[antNum];
         MAX_GEN = g;
-        alpha = a;
-        beta = b;
-        rho = r;
+        this.a = a;
+        this.b = b;
+        this.r = r;
+        bestLengthTracker = new LinkedList<>();
     }
 
     private static String fileChooser(){
@@ -104,12 +103,12 @@ public class ACO {
         cityNum = Integer.parseInt(line.substring(11,line.length()));
 
         //edgeWeightSection
-        distance = new int[cityNum][cityNum];
+        distanceTable = new int[cityNum][cityNum];
         for(int i = tagEdgeWeightSection+1;i<tagDisplayDataSection;i++){
             line = file.get(i);
             String[] nums = line.split("\\D+");
             for(int j=0;j<cityNum;j++){
-                distance[i-tagEdgeWeightSection-1][j] = Integer.parseInt(nums[j+1]);
+                distanceTable[i-tagEdgeWeightSection-1][j] = Integer.parseInt(nums[j+1]);
             }
         }
 
@@ -129,54 +128,93 @@ public class ACO {
     private void init(String path) throws IOException {
         readFile(path);
         processFile();
-        pheromone = new float[cityNum][cityNum];
+        pheromoneTable = new double[cityNum][cityNum];
         for (int i = 0; i < cityNum; i++) {
             for (int j = 0; j < cityNum; j++) {
-                pheromone[i][j] = 0.1f;
+                pheromoneTable[i][j] = 0.1f;
             }
         }
         bestLength = Integer.MAX_VALUE;
         bestTour = new int[cityNum + 1];
         for (int i = 0; i < antNum; i++) {
             ants[i] = new Ant(cityNum);
-            ants[i].init(distance, alpha, beta);
+            ants[i].init(distanceTable, a, b);
         }
     }
 
     private void solve() {
-        for (int g = 0; g < MAX_GEN; g++) {
-            for (int i = 0; i < antNum; i++) {
-                for (int j = 1; j < cityNum; j++) {
-                    ants[i].selectNextCity(pheromone);
+        for (int g = 0; g < MAX_GEN; g++) {  //generation
+            for (int i = 0; i < antNum; i++) {  //ants
+                for (int j = 1; j < cityNum; j++) {  //move ant to next city
+                    ants[i].selectNextCity(pheromoneTable);
                 }
                 ants[i].getTabuList().add(ants[i].getFirstCity());
-                if (ants[i].getTourLength() < bestLength) {
+                if (ants[i].getTourLength() < bestLength) {   //if find better solution
                     bestLength = ants[i].getTourLength();
                     for (int k = 0; k < cityNum + 1; k++) {
                         bestTour[k] = ants[i].getTabuList().get(k);
                     }
                 }
                 for (int j = 0; j < cityNum; j++) {
-                    ants[i].getDelta()[ants[i].getTabuList().get(j)][ants[i].getTabuList().get(j + 1)] = (float) (1.0 / ants[i].getTourLength());
-                    ants[i].getDelta()[ants[i].getTabuList().get(j + 1)][ants[i].getTabuList().get(j)] = (float) (1.0 / ants[i].getTourLength());
+                    ants[i].getDelta()[ants[i].getTabuList().get(j)][ants[i].getTabuList().get(j + 1)] = (1.0 / ants[i].getTourLength());
+                    ants[i].getDelta()[ants[i].getTabuList().get(j + 1)][ants[i].getTabuList().get(j)] = (1.0 / ants[i].getTourLength());
                 }
             }
             updatePheromone();
             for (int i = 0; i < antNum; i++) {
-                ants[i].init(distance, alpha, beta);
+                ants[i].init(distanceTable, a, b);
             }
+            if(debug) System.out.println("Generation "+g+": "+bestLength);
+            bestLengthTracker.offer(bestLength);
         }
         printBestResult();
+
+    }
+
+    private void display(){
+        Frame display = new Frame(550,600,x,y,bestTour);
+    }
+
+    private void writeFile(){
+        try{
+            File file = new File("output.txt");
+            if(!file.exists()) file.createNewFile();  //if does not exist
+
+            FileWriter fileWriter = new FileWriter(file.getName(),false);
+            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+            String data="";
+            int gen=0;
+
+            data += "antNum" + "\t" + Integer.toString(antNum) + "\n";
+            data += "MAX_GEN" + "\t" + Integer.toString(MAX_GEN) + "\n";
+            data += "alpha" + "\t" + Double.toString(a) + "\n";
+            data += "beta" + "\t" + Double.toString(b) + "\n";
+            data += "rho" + "\t" + Double.toString(r) + "\n";
+
+            data += "Generation" + "\t" + "length" + "\n";
+            while(!bestLengthTracker.isEmpty()){
+                data += (Integer.toString(gen)+"\t"+Integer.toString(bestLengthTracker.poll()));
+                data += "\n";
+                gen++;
+            }
+
+            bufferedWriter.write(data);
+            bufferedWriter.close();
+            System.out.println("File saved.");
+
+        }catch(IOException e){
+            e.printStackTrace();
+        }
     }
 
     private void updatePheromone() {
         for (int i = 0; i < cityNum; i++)
             for (int j = 0; j < cityNum; j++)
-                pheromone[i][j] = pheromone[i][j] * (1 - rho);
+                pheromoneTable[i][j] = pheromoneTable[i][j] * (1 - r);
         for (int i = 0; i < cityNum; i++) {
             for (int j = 0; j < cityNum; j++) {
                 for (int k = 0; k < antNum; k++) {
-                    pheromone[i][j] += ants[k].getDelta()[i][j];
+                    pheromoneTable[i][j] += ants[k].getDelta()[i][j];
                 }
             }
         }
@@ -185,15 +223,52 @@ public class ACO {
     private void printBestResult() {
         System.out.println("The best length found is: " + bestLength);
         System.out.println("The best tour found is: ");
+        String output="";
         for (int i = 0; i < cityNum + 1; i++) {
-            System.out.println(bestTour[i]);
+            String cityTag = Integer.toString(bestTour[i]+1);
+            output += cityTag;
+            if(i != cityNum) output += " >> ";
         }
+        System.out.println(output);
     }
 
     public static void main(String[] args) throws IOException {
-        ACO aco = new ACO(10, 100, 1.f, 5.f, 0.5f);
-        aco.init(fileChooser());
+        ACO aco;
+
+        if(debug){
+            aco = new ACO(50, 100, 1.0, 5.0, 0.5);
+            aco.init("ACO/bays29.tsp");
+        }
+        else{
+            int m,g;
+            double a,b,r;
+            Scanner scanner = new Scanner(System.in);
+
+            System.out.println("Please input number of ants:");
+            m = scanner.nextInt();
+            System.out.println("Please input maximum generations:");
+            g = scanner.nextInt();
+            System.out.println("Please input parameters");
+            System.out.println("alpha:");
+            a = scanner.nextDouble();
+            System.out.println("beta:");
+            b = scanner.nextDouble();
+            System.out.println("rho:");
+            r = scanner.nextDouble();
+            aco = new ACO(m,g,a,b,r);
+
+            System.out.println("Use bays29.tsp as data file?(y/n)(1/0)");
+            while(!scanner.hasNext());
+            String f = scanner.next();
+            if(f.equals("y") || f.equals("Y") || f.equals("1"))  aco.init("ACO/bays29.tsp");
+            else {
+                System.out.println("Please choose the data file:");
+                aco.init(fileChooser());
+            }
+        }
         aco.solve();
+        aco.display();
+        aco.writeFile();
     }
 
 }

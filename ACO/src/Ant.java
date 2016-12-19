@@ -7,10 +7,10 @@ import java.util.Random;
 public class Ant implements Cloneable{
     private ArrayList<Integer> tabuList;
     private ArrayList<Integer> allowedCities;
-    private float[][] delta;
+    private double[][] delta;
     private int[][] distance;
-    private float alpha;
-    private float beta;
+    private double alpha;
+    private double beta;
 
     private int tourLength;
     private int cityNum;
@@ -22,19 +22,19 @@ public class Ant implements Cloneable{
         tourLength=0;
     }
 
-    public void init(int[][] distance, float a, float b){
+    public void init(int[][] distance, double a, double b){
         alpha = a;
         beta = b;
         allowedCities = new ArrayList<>();
         tabuList = new ArrayList<>();
         this.distance = distance;
 
-        delta = new float[cityNum][cityNum];
+        delta = new double[cityNum][cityNum];
         for(int i=0;i<cityNum;i++){
             Integer n = i;
             allowedCities.add(n);
             for(int j=0;j<cityNum;j++){
-                delta[i][j] = 0.f;
+                delta[i][j] = 0.0;
             }
         }
         Random random = new Random(System.currentTimeMillis());
@@ -50,33 +50,33 @@ public class Ant implements Cloneable{
 
     }
 
-    public void selectNextCity(float[][] pheromone){
-        float[] p = new float[cityNum];
-        float sum = 0.0f;
+    public void selectNextCity(double[][] pheromone){
+        double[] p = new double[cityNum];
+        double sum = 0.0;
         for (Integer i : allowedCities) {
             sum += Math.pow(pheromone[currentCity][i], alpha) * Math.pow(1.0 / distance[currentCity][i], beta);
         }
         for(int i=0;i<cityNum;i++){
-            boolean flag = false;
+            boolean found = false;
             for(Integer j : allowedCities){
                 if(j.equals(i)){
-                    p[i] = (float) (Math.pow(pheromone[currentCity][i], alpha) * Math.pow(1.0 / distance[currentCity][i], beta)) / sum;
-                    flag = true;
+                    p[i] = (Math.pow(pheromone[currentCity][i], alpha) * Math.pow(1.0 / distance[currentCity][i], beta)) / sum;
+                    found = true;
                     break;
                 }
             }
-            if(!flag){
-                p[i] = 0.0f;
+            if(!found){
+                p[i] = 0.0;
             }
         }
 
-        Random random = new Random(System.currentTimeMillis());
-        float selectP = random.nextFloat();
+        Random random = new Random();
+        double selectP = random.nextFloat();
         int selectCity = 0;
-        float sum1 = 0.f;
+        double tSum = 0.0;
         for (int i = 0; i < cityNum; i++) {
-            sum1 += p[i];
-            if (sum1 >= selectP) {
+            tSum += p[i];
+            if (tSum >= selectP) {
                 selectCity = i;
                 break;
             }
@@ -113,11 +113,11 @@ public class Ant implements Cloneable{
         this.tabuList = tabuList;
     }
 
-    public float[][] getDelta() {
+    public double[][] getDelta() {
         return this.delta;
     }
 
-    public void setDelta(float[][] delta) {
+    public void setDelta(double[][] delta) {
         this.delta = delta;
     }
 
